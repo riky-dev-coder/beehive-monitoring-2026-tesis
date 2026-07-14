@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Resend
     resend_api_key: Optional[str] = Field(default=None, env='RESEND_API_KEY')
-    resend_from_email: str = Field('alertas-beehive@municastilla-arequipa.gob.pe', env='RESEND_FROM_EMAIL')
+    resend_from_email: str = Field('alertasbeehive@municastilla-arequipa.gob.pe', env='RESEND_FROM_EMAIL')
     resend_to_email: str = Field('mizdezu@gmail.com', env='RESEND_TO_EMAIL')
     
     # Umbrales de alerta
