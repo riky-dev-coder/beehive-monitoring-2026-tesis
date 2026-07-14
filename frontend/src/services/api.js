@@ -62,4 +62,17 @@ export const getHarvestPrediction = async () => {
   }
 };
 
+/**
+ * Obtiene el estado de salud de la colmena (healthy | at_risk | critical)
+ */
+export const getHiveHealth = async () => {
+  try {
+    const response = await api.get('/sensors/health');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching hive health:', error);
+    throw error;
+  }
+};
+
 export default api;

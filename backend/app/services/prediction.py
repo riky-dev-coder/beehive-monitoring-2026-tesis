@@ -1,4 +1,7 @@
-import numpy as np
+try:
+    import numpy as np
+except Exception:
+    np = None
 from datetime import datetime, timedelta
 from typing import Optional
 from app.core.database import get_supabase_client
@@ -35,39 +38,44 @@ async def predict_harvest_date() -> Optional[datetime]:
     first_ts = timestamps[0]
     days = [(ts - first_ts).total_seconds() / 86400.0 for ts in timestamps]
     
+    # Si numpy no está disponible, no podemos hacer regresión
+    if np is None:
+        logger.info("Numpy no disponible: omitiendo predicción de cosecha (fallback)")
+        return None
+
     # Regresión lineal: y = a * x + b
     x = np.array(days)
     y = np.array(values)
-    
+
     # Calcular pendiente e intercepto
     n = len(x)
     sum_x = np.sum(x)
     sum_y = np.sum(y)
     sum_xy = np.sum(x * y)
     sum_x2 = np.sum(x * x)
-    
+
     denominator = n * sum_x2 - sum_x**2
     if denominator == 0:
         return None
-    
+
     slope = (n * sum_xy - sum_x * sum_y) / denominator
     intercept = (sum_y - slope * sum_x) / n
-    
+
     # Si la pendiente es negativa, la colmena está perdiendo peso
     if slope <= 0:
         logger.info("Tendencia de peso negativa, no se puede predecir cosecha")
         return None
-    
+
     # Calcular días para alcanzar peso_min_cosecha
     from app.core.config import settings
     target_weight = settings.peso_mielera_min_cosecha
     # Resolver target = slope * days + intercept
     days_to_target = (target_weight - intercept) / slope
-    
+
     # Si ya se superó el target, retornar hoy
     if days_to_target <= days[-1]:
         return datetime.utcnow()
-    
+
     # Fecha estimada
     estimated_date = first_ts + timedelta(days=days_to_target)
     return estimated_date

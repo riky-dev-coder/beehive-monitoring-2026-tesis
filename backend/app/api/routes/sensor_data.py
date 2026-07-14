@@ -108,3 +108,10 @@ async def get_available_months():
 async def get_harvest_readiness():
     from app.services.prediction import get_harvest_readiness
     return await get_harvest_readiness()
+
+
+@router.get("/health")
+async def get_hive_health_route():
+    """Endpoint que retorna el estado de salud de la colmena usando el modelo de IA."""
+    from app.services.health_prediction import compute_hive_health
+    return await compute_hive_health()

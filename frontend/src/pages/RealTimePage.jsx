@@ -4,6 +4,7 @@ import MiniSparkline from '../components/Charts/MiniSparkline'
 import AnimatedProgressBar from '../components/DataCards/AnimatedProgressBar'
 import { useAnimatedValue } from '../hooks/useAnimatedValue'
 import { useHarvestPrediction } from '../hooks/useHarvestPrediction'
+import { useHiveHealth } from '../hooks/useHiveHealth'
 import { getSensorDataLatest, getSensorHistory } from '../services/api'
 
 export default function RealTimePage() {
@@ -27,6 +28,7 @@ export default function RealTimePage() {
 
   // Hook para obtener predicción de cosecha del backend
   const { prediction: harvestPrediction, loading: predictionLoading } = useHarvestPrediction()
+  const { health: hiveHealth, loading: hiveHealthLoading } = useHiveHealth()
 
   // Función para transformar datos del backend al formato de la UI
   const processSensorData = (sensorDataArray) => {
@@ -356,7 +358,23 @@ export default function RealTimePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           <div className="p-2 bg-[#071014] rounded">
             <span className="text-gray-500">Estado</span>
-            <p className="text-emerald-400 font-medium mt-1">● Saludable</p>
+            {hiveHealthLoading ? (
+              <p className="text-gray-400 font-medium mt-1">Cargando...</p>
+            ) : hiveHealth ? (
+              (() => {
+                const status = hiveHealth.status || 'unknown'
+                if (status === 'healthy') {
+                  return <p className="text-emerald-400 font-medium mt-1">● Saludable</p>
+                } else if (status === 'at_risk') {
+                  return <p className="text-amber-400 font-medium mt-1">● En riesgo</p>
+                } else if (status === 'critical') {
+                  return <p className="text-red-400 font-medium mt-1">● Crítico</p>
+                }
+                return <p className="text-gray-400 font-medium mt-1">● Desconocido</p>
+              })()
+            ) : (
+              <p className="text-gray-400 font-medium mt-1">No disponible</p>
+            )}
           </div>
           <div className="p-2 bg-[#071014] rounded">
             <span className="text-gray-500">Actividad</span>
