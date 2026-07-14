@@ -35,12 +35,12 @@ async def lifespan(app: FastAPI):
     # Programar tarea periódica
     scheduler.add_job(
         fetch_data_task,
-        trigger=IntervalTrigger(seconds=20),
+        trigger=IntervalTrigger(seconds=40),
         id="fetch_thingspeak",
         replace_existing=True
     )
     scheduler.start()
-    logger.info("Scheduler iniciado. Tarea programada cada 20 segundos.")
+    logger.info("Scheduler iniciado. Tarea programada cada 40 segundos.")
     yield
     # Código de cierre
     logger.info("Deteniendo aplicación...")
