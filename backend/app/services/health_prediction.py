@@ -16,9 +16,20 @@ from app.models.sensor import SensorType
 logger = logging.getLogger(__name__)
 
 
-def _label_from_rules(prev_sample: Dict, sample: Dict) -> str:
+def _state_from_code(code: int) -> Dict:
+    """Devuelve etiqueta y descripción para cada estado numérico."""
+    mapping = {
+        0: {"label": "Normal", "description": "Condiciones térmicas dentro de rangos óptimos"},
+        1: {"label": "Estrés_Frío", "description": "Temperatura de cría baja o exterior muy frío"},
+        2: {"label": "Estrés_Calor", "description": "Temperatura de cría alta o exterior muy caliente"},
+        3: {"label": "Crítico", "description": "Temperaturas extremas, riesgo inmediato"},
+    }
+    return mapping.get(code, {"label": "Desconocido", "description": "Estado no disponible"})
+
+
+def _label_from_rules(prev_sample: Dict, sample: Dict) -> int:
     """Genera una etiqueta heurística basada en reglas simples para entrenamiento.
-    Retorna 'healthy', 'at_risk' o 'critical'.
+    Retorna un código: 0 Normal, 1 Estrés_Frío, 2 Estrés_Calor, 3 Crítico.
     """
     score = 0
 
@@ -48,11 +59,11 @@ def _label_from_rules(prev_sample: Dict, sample: Dict) -> str:
             score += 1
 
     if score >= 3:
-        return "critical"
+        return 3
     elif score >= 1:
-        return "at_risk"
+        return 2
     else:
-        return "healthy"
+        return 0
 
 
 def _features_from_sample(sample: Dict) -> List[float]:
@@ -87,29 +98,29 @@ def _apply_temperature_rules(sample: Dict) -> Dict:
 
     # Si no hay temperatura de cría, no se puede aplicar la regla
     if t_cria is None and t_mielera is None and t_exterior is None:
-        return {"status": "unknown", "confidence": 0.0, "details": {"method": "temp_rules", **details}}
+        return {"status": -1, "confidence": 0.0, "details": {"method": "temp_rules", **details}}
 
     # Crítico: temperaturas extremas
     if (t_cria is not None and (t_cria < 30 or t_cria > 40)) or \
        (t_mielera is not None and (t_mielera < 20 or t_mielera > 45)) or \
        (t_exterior is not None and (t_exterior > 45 or t_exterior < -5)):
-        return {"status": "critical", "confidence": 1.0, "details": {"method": "temp_rules", **details}}
+        return {"status": 3, "confidence": 1.0, "details": {"method": "temp_rules", **details}}
 
     # Estrés por calor: cría alta o mielera fuera por calor o exterior >= 35
     if (t_cria is not None and t_cria > 36) or (t_mielera is not None and t_mielera > 38) or (t_exterior is not None and t_exterior >= 35):
-        return {"status": "at_risk", "confidence": 0.9, "details": {"method": "temp_rules", "reason": "heat", **details}}
+        return {"status": 2, "confidence": 0.9, "details": {"method": "temp_rules", "reason": "heat", **details}}
 
     # Estrés por frío: cría baja o exterior muy frío
     # Definimos "exterior muy frío" como < 10°C
     if (t_cria is not None and t_cria < 34) or (t_exterior is not None and t_exterior < 10):
-        return {"status": "at_risk", "confidence": 0.9, "details": {"method": "temp_rules", "reason": "cold", **details}}
+        return {"status": 1, "confidence": 0.9, "details": {"method": "temp_rules", "reason": "cold", **details}}
 
     # Normal: dentro de rangos óptimos
     if (t_cria is None or (34 <= t_cria <= 36)) and (t_mielera is None or (30 <= t_mielera <= 38)):
-        return {"status": "healthy", "confidence": 0.95, "details": {"method": "temp_rules", **details}}
+        return {"status": 0, "confidence": 0.95, "details": {"method": "temp_rules", **details}}
 
-    # Fallback: en caso de duda, marcar como at_risk
-    return {"status": "at_risk", "confidence": 0.5, "details": {"method": "temp_rules", **details}}
+    # Fallback: en caso de duda, marcar como estrés frío/calor según el valor
+    return {"status": 1, "confidence": 0.5, "details": {"method": "temp_rules", **details}}
 
 
 async def compute_hive_health() -> Dict:
@@ -128,7 +139,13 @@ async def compute_hive_health() -> Dict:
 
     data = resp.data or []
     if not data:
-        return {"status": "unknown", "confidence": 0.0, "message": "No hay datos"}
+        return {
+            "status": -1,
+            "confidence": 0.0,
+            "message": "No hay datos",
+            "state_label": "Desconocido",
+            "description": "No hay datos disponibles",
+        }
 
     # Agrupar por timestamp ISO (mantener como string para clave)
     samples = {}
@@ -160,9 +177,15 @@ async def compute_hive_health() -> Dict:
 
     # Aplicar reglas heurísticas de temperatura primero (modo solicitado)
     temp_result = _apply_temperature_rules(latest)
-    # Si temp_result no es 'unknown', devolver inmediatamente (prioridad a reglas de temperatura)
-    if temp_result.get("status") != "unknown":
-        return temp_result
+    # Si temp_result no es desconocido, devolver inmediatamente (prioridad a reglas de temperatura)
+    if temp_result.get("status") != -1:
+        state = _state_from_code(temp_result["status"])
+        return {
+            **temp_result,
+            "status": temp_result["status"],
+            "state_label": state["label"],
+            "description": state["description"],
+        }
 
     # Si no hay suficientes muestras para entrenar, aplicar reglas a la última muestra
     if len(X) < 10 or not SKLEARN_AVAILABLE:
@@ -170,10 +193,13 @@ async def compute_hive_health() -> Dict:
         details = {"method": "rules_fallback"}
         if not SKLEARN_AVAILABLE:
             details["sklearn"] = "not_available"
+        state = _state_from_code(label)
         return {
             "status": label,
             "confidence": 1.0,
             "details": details,
+            "state_label": state["label"],
+            "description": state["description"],
         }
 
     try:
@@ -185,17 +211,23 @@ async def compute_hive_health() -> Dict:
         pred = clf.predict([_features_from_sample(latest)])[0]
         prob = float(probs[list(classes).index(pred)]) if pred in classes else 0.0
 
+        state = _state_from_code(int(pred)) if str(pred).isdigit() else _state_from_code(0)
         return {
-            "status": pred,
+            "status": int(pred),
             "confidence": round(prob, 3),
             "details": {"method": "decision_tree", "classes": list(classes)},
+            "state_label": state["label"],
+            "description": state["description"],
         }
     except Exception as e:
         logger.exception("Error entrenando o prediciendo árbol de decisión")
         # Fallback por reglas
         label = _label_from_rules(rows[-2] if len(rows) > 1 else None, latest)
+        state = _state_from_code(label)
         return {
             "status": label,
             "confidence": 0.0,
             "details": {"method": "rules_fallback", "error": str(e)},
+            "state_label": state["label"],
+            "description": state["description"],
         }

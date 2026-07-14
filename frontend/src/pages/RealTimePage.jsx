@@ -362,15 +362,20 @@ export default function RealTimePage() {
               <p className="text-gray-400 font-medium mt-1">Cargando...</p>
             ) : hiveHealth ? (
               (() => {
-                const status = hiveHealth.status || 'unknown'
-                if (status === 'healthy') {
-                  return <p className="text-emerald-400 font-medium mt-1">● Saludable</p>
-                } else if (status === 'at_risk') {
-                  return <p className="text-amber-400 font-medium mt-1">● En riesgo</p>
-                } else if (status === 'critical') {
-                  return <p className="text-red-400 font-medium mt-1">● Crítico</p>
+                const statusCode = Number(hiveHealth.status ?? -1)
+                const stateStyles = {
+                  0: 'text-emerald-400',
+                  1: 'text-sky-400',
+                  2: 'text-amber-400',
+                  3: 'text-red-400',
                 }
-                return <p className="text-gray-400 font-medium mt-1">● Desconocido</p>
+                const stateLabel = hiveHealth.state_label || (
+                  statusCode === 0 ? 'Normal' :
+                  statusCode === 1 ? 'Estrés_Frío' :
+                  statusCode === 2 ? 'Estrés_Calor' :
+                  statusCode === 3 ? 'Crítico' : 'Desconocido'
+                )
+                return <p className={`${stateStyles[statusCode] || 'text-gray-400'} font-medium mt-1`}>● {stateLabel}</p>
               })()
             ) : (
               <p className="text-gray-400 font-medium mt-1">No disponible</p>
