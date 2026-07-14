@@ -25,9 +25,11 @@ async def send_latest_recommendation_email() -> bool:
     subject = f"Recomendación IA: {title}"
     text = f"{title}\n\n{body}".strip()
 
+    recipient_email = "mizdezu@gmail.com"
+
     payload = {
         "from": f"Beehive Monitoring <{settings.resend_from_email}>",
-        "to": [settings.resend_to_email],
+        "to": [recipient_email],
         "subject": subject,
         "text": text,
     }
@@ -49,7 +51,7 @@ async def send_latest_recommendation_email() -> bool:
         logger.exception("Error al enviar el correo con la recomendación IA")
         return False
 
-    logger.info("Correo enviado correctamente con la última recomendación IA")
+    logger.info(f"Correo enviado correctamente con la última recomendación IA a {recipient_email}")
     return True
 
 
