@@ -128,7 +128,7 @@ async def generate_recommendation_from_alerts(
     }
 
     payload = {
-        "model": "z-ai/glm-4.5-air:free",
+        "model": "openrouter/free",
         "messages": [
             {
                 "role": "system",
