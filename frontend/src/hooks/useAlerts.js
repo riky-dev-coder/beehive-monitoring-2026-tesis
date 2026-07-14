@@ -12,7 +12,7 @@ export const useAlerts = (activeOnly = false) => {
       });
       setAlerts(response.data);
     } catch (error) {
-      console.error('Error fetching alerts:', error);
+      console.error('Error al recuperar alertas:', error);
     } finally {
       setLoading(false);
     }

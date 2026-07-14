@@ -11,7 +11,7 @@ export const useRecommendations = () => {
       const response = await api.post('/recommendations/history', { context });
       setRecommendation(response.data.recommendation);
     } catch (error) {
-      console.error('Error generating recommendation:', error);
+      console.error('Error al generar recomendación:', error);
       setRecommendation('Error al obtener recomendación');
     } finally {
       setLoading(false);

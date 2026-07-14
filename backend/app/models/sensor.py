@@ -21,7 +21,7 @@ class SensorData(BaseModel):
     unit: str | None = Field(None, description="Unidad de medida (ej. °C, %, kg)")
 
     class Config:
-        from_attributes = True  # Para compatibilidad con ORM si se usa SQLAlchemy
+        from_attributes = True  # compatibilidad con ORM en SQLAlchemy
         json_schema_extra = {
             "example": {
                 "id": 1,
@@ -31,3 +31,12 @@ class SensorData(BaseModel):
                 "unit": "°C"
             }
         }
+
+class AggregatedSensorData(BaseModel):
+    """Respuesta del endpoint /history con datos agrupados."""
+    timestamp:   datetime
+    sensor_type: str
+    value:       float    # promedio del intervalo
+    min_value:   float    # para bandas de error en el gráfico
+    max_value:   float
+    count:       int      # muestras en el bucket

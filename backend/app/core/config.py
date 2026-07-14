@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Pesos
     peso_cria_min: float = 18.0   # kg
     peso_cria_max: float = 29.0  # kg
-    peso_mielera_min_cosecha: float = 10.0  # kg, umbral para cosechar
+    peso_mielera_min_cosecha: float = 20.0  # kg, umbral para cosechar
     peso_mielera_disminucion_alerta: float = 1.0  # kg, disminución para alertar
 
     class Config:

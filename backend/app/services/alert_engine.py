@@ -36,9 +36,7 @@ async def evaluate_sensor_data(readings: List[SensorData]):
     # Peso de cría fuera de rango
     if SensorType.PESO_TOTAL in readings_by_type:
         peso_total = readings_by_type[SensorType.PESO_TOTAL].value
-        # El peso total incluye ambas cámaras. Para evaluar peso de cría, necesitamos el peso de la mielera.
-        # Pero como no tenemos separado, podríamos considerar que el peso de cría es el total menos el de mielera.
-        # Sin embargo, el enunciado dice: "el rango de peso optimo de la cámara de cría es entre 5 kg a 10 kg".
+        # el rango de peso optimo de la cámara de cría es entre 5 kg a 10 kg.
         # Si tenemos sensor de peso total y sensor de peso mielera, entonces peso_cria = peso_total - peso_mielera.
         if SensorType.PESO_MIELERA in readings_by_type:
             peso_mielera = readings_by_type[SensorType.PESO_MIELERA].value
@@ -66,7 +64,7 @@ async def evaluate_sensor_data(readings: List[SensorData]):
             )
         
         # Detectar disminución significativa (requiere comparar con lecturas anteriores)
-        # Para eso necesitamos consultar la última lectura anterior del mismo sensor
+        # Para eso consultar la última lectura anterior del mismo sensor
         await check_weight_drop(SensorType.PESO_MIELERA, peso_mielera, settings.peso_mielera_disminucion_alerta)
 
 async def check_weight_drop(sensor_type: SensorType, current_value: float, threshold: float):

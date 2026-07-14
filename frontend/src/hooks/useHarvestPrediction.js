@@ -1,6 +1,6 @@
 // hooks/useHarvestPrediction.js
 import { useState, useEffect } from 'react';
-import api from '../services/api';
+import { getHarvestPrediction } from '../services/api';
 
 export const useHarvestPrediction = () => {
   const [prediction, setPrediction] = useState(null);
@@ -9,10 +9,12 @@ export const useHarvestPrediction = () => {
 
   const fetchPrediction = async () => {
     try {
-      const response = await api.get('/sensors/harvest-readiness');
-      setPrediction(response.data);
+      setLoading(true);
+      const data = await getHarvestPrediction();
+      setPrediction(data);
       setError(null);
     } catch (err) {
+      console.error('Error fetching harvest prediction:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -21,7 +23,9 @@ export const useHarvestPrediction = () => {
 
   useEffect(() => {
     fetchPrediction();
-    // Podríamos actualizar cada cierto tiempo, pero por ahora solo una vez
+    // Actualizar cada 30 segundos
+    const interval = setInterval(fetchPrediction, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return { prediction, loading, error, refetch: fetchPrediction };

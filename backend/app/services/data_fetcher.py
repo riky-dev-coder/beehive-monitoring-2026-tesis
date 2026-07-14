@@ -1,15 +1,15 @@
 import httpx
-from datetime import datetime
-from typing import Dict, Any, List
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.core.database import get_supabase_client
-from app.models.sensor import SensorType, SensorData
+from app.models.sensor import SensorType, SensorData, AggregatedSensorData
 import logging
+import calendar
 
 logger = logging.getLogger(__name__)
 
-# Mapeo de field de ThingSpeak a sensor type y unidad
-# Asumiendo:
+# Mapeo de field en ThingSpeak a sensor_type y unidad
 # field1 = temp cria (°C)
 # field2 = temp mielera (°C)
 # field3 = temp exterior (°C)
@@ -138,21 +138,75 @@ async def get_latest_readings():
             latest.append(SensorData(**data))
     return latest
 
-async def get_historical_readings(sensor_type=None, start_date=None, end_date=None, limit=100):
+# ─────────────────────────────────────────────────────────────────────────────
+# Optimizacion de consultas históricas con agregación en la base de datos
+# ─────────────────────────────────────────────────────────────────────────────
+RESOLUTION_MAP = {
+    "1h":    "1 minute",   # ~60  puntos
+    "24h":   "5 minutes",  # ~288 puntos
+    "7d":    "1 hour",     # ~168 puntos
+    "month": "6 hours",    # ~120 puntos
+}
+
+async def get_historical_readings_aggregated(
+    sensor_type: Optional[SensorType],
+    start_date: datetime,
+    end_date: datetime,
+    resolution: str,
+) -> List[AggregatedSensorData]:
     """
-    Obtiene lecturas históricas con filtros.
+    Llama a la función PostgreSQL get_sensor_history_aggregated() via RPC.
+    Devuelve promedios por intervalo — nunca rows crudos.
     """
     supabase = get_supabase_client()
-    query = supabase.table("sensor_readings").select("id, timestamp, sensor_type, value, unit")
-    
-    if sensor_type:
-        query = query.eq("sensor_type", sensor_type.value)
-    if start_date:
-        query = query.gte("timestamp", start_date.isoformat())
-    if end_date:
-        query = query.lte("timestamp", end_date.isoformat())
-    
-    query = query.order("timestamp", desc=True).limit(limit)
-    response = query.execute()
-    
-    return [SensorData(**item) for item in response.data]
+
+    params = {
+        "p_start_date":  start_date.isoformat(),
+        "p_end_date":    end_date.isoformat(),
+        "p_resolution":  resolution,
+        "p_sensor_type": sensor_type.value if sensor_type else None,
+    }
+
+    response = supabase.rpc("get_sensor_history_aggregated", params).execute()
+
+    if not response.data:
+        return []
+
+    result = []
+    for row in response.data:
+        result.append(AggregatedSensorData(
+            timestamp=row["bucket"],
+            sensor_type=row["sensor_type"],
+            value=row["value"],
+            min_value=row["min_value"],
+            max_value=row["max_value"],
+            count=row["count"],
+        ))
+    return result
+
+
+async def get_months_with_data() -> List[dict]:
+    """
+    Llama a get_available_months() en Supabase.
+    El frontend usa la funcion para llenar el selector de mes.
+    """
+    MONTHS_ES = [
+        "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ]
+
+    supabase = get_supabase_client()
+    response = supabase.rpc("get_available_months", {}).execute()
+
+    if not response.data:
+        return []
+
+    return [
+        {
+            "year":  row["year"],
+            "month": row["month"],
+            "label": f"{MONTHS_ES[row['month']]} {row['year']}",
+            "value": f"{row['year']}-{row['month']:02d}",  # "2025-02"
+        }
+        for row in response.data
+    ]

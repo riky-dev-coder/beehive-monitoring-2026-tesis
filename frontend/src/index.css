@@ -1,3 +1,54 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Animaciones personalizadas */
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes glow-border {
+  0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.1); }
+  50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+}
+
+.animate-scan-line {
+  animation: scan-line 1.5s ease-in-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.data-updated {
+  animation: glow-border 1s ease-out;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #071014;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Transición suave para valores */
+.value-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

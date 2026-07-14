@@ -48,7 +48,7 @@ const AlertList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const fetchAlerts = async () => {
     try {
-      console.log("API URL:", api.defaults.baseURL);
+      //console.log("API URL:", api.defaults.baseURL);
       const response = await api.get('/alerts/history');
       setAlerts(response.data);
     } catch (error) {

@@ -128,7 +128,7 @@ async def generate_recommendation_from_alerts(
     }
 
     payload = {
-        "model": "deepseek/deepseek-v3.2",
+        "model": "z-ai/glm-4.5-air:free",
         "messages": [
             {
                 "role": "system",

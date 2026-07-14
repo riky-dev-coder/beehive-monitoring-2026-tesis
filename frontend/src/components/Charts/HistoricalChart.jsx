@@ -14,13 +14,13 @@ import api from "../../services/api";
 
 const COLORS = {
   temp_cria: "#34d399",
-  temp_mielera: "#fb923c",
+  temp_mielera: "#a78bfa", // morado
   temp_exterior: "#f87171",
   humedad_cria: "#34d399",
-  humedad_mielera: "#a78bfa",
+  humedad_mielera: "#a78bfa", // morado
   humedad_exterior: "#22d3ee",
-  peso_total: "#10b981",
-  peso_mielera: "#059669",
+  peso_total: "#34d399",
+  peso_mielera: "#fb923c", // naranja
 };
 
 const SENSOR_LABELS = {
@@ -49,56 +49,36 @@ const HistoricalChart = ({
   sensors = [],
   optimalRange,
   timeRange = "24h",
+  selectedMonth = "",
   title = "",
   showDownload = true, // nuevo prop si quieres desactivar descarga a nivel de instancia
 }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const sensorsKey = sensors.join(",");
 
   const timeParams = useMemo(() => {
-    const now = new Date();
-    let startDate;
-    let allTime = false;
-    switch (timeRange) {
-      case "1h":
-        startDate = new Date(now.getTime() - 60 * 60 * 1000);
-        break;
-      case "24h":
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case "7d":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "all":
-        startDate = null;
-        allTime = true;
-        break;
-      default:
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    }
+    const base = { time_range: timeRange };
 
-    return {
-      start_date: allTime ? undefined : startDate?.toISOString(),
-      end_date: allTime ? undefined : now.toISOString(),
-      limit: timeRange === "all" ? 5000 : timeRange === "7d" ? 1000 : 200,
-      all_time: allTime,
-    };
-  }, [timeRange]);
+    if (timeRange === "month" && selectedMonth) {
+      const [year, month] = selectedMonth.split("-");
+      return { ...base, year: Number(year), month: Number(month) };
+    }
+    return base;
+  }, [timeRange, selectedMonth]);
 
   useEffect(() => {
     let interval;
-    
+    // Si el rango es mensual pero no hay mes seleccionado, no hacer fetch
     const fetchHistory = async (isInitialLoad = false) => {
       if (isInitialLoad) setLoading(true);
-
       try {
         const promises = sensors.map(async (sensorType) => {
           const response = await api.get("/sensors/history", {
             params: {
               sensor_type: sensorType,
-              ...timeParams
+              ...timeParams, // { time_range, year?, month? }
             },
           });
           return { sensorType, data: response.data };
@@ -109,6 +89,7 @@ const HistoricalChart = ({
 
         results.forEach(({ sensorType, data }) => {
           data.forEach((item) => {
+            //campo 'timestamp' mapeado desde 'bucket' en el router
             const ts = Math.floor(new Date(item.timestamp).getTime() / 1000);
             if (!combined[ts]) {
               combined[ts] = { timestamp: item.timestamp, _ts: ts };
@@ -129,24 +110,25 @@ const HistoricalChart = ({
 
         setData(chartData);
       } catch (error) {
-        console.error("Error fetching historical data:", error);
+        console.error("Error al recuperar datos históricos:", error);
       } finally {
         setLoading(false);
       }
     };
-
+    // Bloquear fetch de mes si no hay mes seleccionado aún
+    if (timeRange === "month" && !selectedMonth) return;
     fetchHistory(true);
-
+    // Solo refrescar automáticamente en rangos cortos
     if (timeRange === "1h" || timeRange === "24h") {
-      const intervalTime = timeRange === "1h" ? 60000 : 300000; // 1 min o 5 min
+      const intervalTime = timeRange === "1h" ? 60_000 : 300_000;
       interval = setInterval(() => fetchHistory(false), intervalTime);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sensorsKey, timeParams, timeRange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sensorsKey, timeParams, timeRange, selectedMonth]);
 
   // ---------- FUNCIONES DE EXPORTACIÓN ----------
   const makeFilename = (ext) => {
@@ -158,8 +140,12 @@ const HistoricalChart = ({
     let rangePart = timeRange;
     // si hay datos, crear rango de fechas más legible
     if (data && data.length) {
-      const first = new Date(data[0].timestamp).toISOString().replace(/[:.]/g, "-");
-      const last = new Date(data[data.length - 1].timestamp).toISOString().replace(/[:.]/g, "-");
+      const first = new Date(data[0].timestamp)
+        .toISOString()
+        .replace(/[:.]/g, "-");
+      const last = new Date(data[data.length - 1].timestamp)
+        .toISOString()
+        .replace(/[:.]/g, "-");
       rangePart = `${first}_to_${last}`;
     }
     return `${safeTitle}_${rangePart}.${ext}`;
@@ -168,17 +154,23 @@ const HistoricalChart = ({
   const downloadCSV = () => {
     if (!data || !data.length) return;
     // header: timestamp, label (unit)
-    const headers = ["timestamp", ...sensors.map(s => `${SENSOR_LABELS[s] || s}${SENSOR_UNITS[s] ? ` (${SENSOR_UNITS[s]})` : ""}`)];
-    const rows = data.map(row => {
+    const headers = [
+      "timestamp",
+      ...sensors.map(
+        (s) =>
+          `${SENSOR_LABELS[s] || s}${SENSOR_UNITS[s] ? ` (${SENSOR_UNITS[s]})` : ""}`,
+      ),
+    ];
+    const rows = data.map((row) => {
       return [
         // timestamp ISO
         row.timestamp,
-        ...sensors.map(s => {
+        ...sensors.map((s) => {
           const v = row[s];
           if (v === null || v === undefined) return "";
           // si es number, formatear con 2 decimales
           return typeof v === "number" ? v.toFixed(2) : String(v);
-        })
+        }),
       ].join(",");
     });
 
@@ -196,7 +188,9 @@ const HistoricalChart = ({
 
   const downloadJSON = () => {
     if (!data || !data.length) return;
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -211,19 +205,33 @@ const HistoricalChart = ({
   const formatXAxis = (timestamp) => {
     const date = new Date(timestamp);
     if (timeRange === "1h" || timeRange === "24h") {
-      return date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+      return date.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
-    return date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+    return date.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+    });
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-[#0f1720] border border-gray-800 p-3 rounded-xl shadow-lg">
-          <p className="text-gray-400 text-xs mb-2">{new Date(label).toLocaleString()}</p>
+          <p className="text-gray-400 text-xs mb-2">
+            {new Date(label).toLocaleString()}
+          </p>
           {payload.map((entry) => (
-            <p key={entry.name} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: {entry.value?.toFixed ? entry.value?.toFixed(1) : entry.value} {SENSOR_UNITS[entry.dataKey] ?? ""}
+            <p
+              key={entry.name}
+              style={{ color: entry.color }}
+              className="text-sm"
+            >
+              {entry.name}:{" "}
+              {entry.value?.toFixed ? entry.value?.toFixed(1) : entry.value}{" "}
+              {SENSOR_UNITS[entry.dataKey] ?? ""}
             </p>
           ))}
         </div>
@@ -258,7 +266,7 @@ const HistoricalChart = ({
             <button
               onClick={downloadCSV}
               disabled={!data.length}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${data.length ? 'bg-blue-600 text-white shadow' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${data.length ? "bg-blue-600 text-white shadow" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
               aria-label="Descargar CSV"
             >
               Exportar CSV
@@ -266,7 +274,7 @@ const HistoricalChart = ({
             <button
               onClick={downloadJSON}
               disabled={!data.length}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${data.length ? 'bg-gray-800 text-white border border-gray-700 hover:bg-gray-700' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${data.length ? "bg-gray-800 text-white border border-gray-700 hover:bg-gray-700" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
               aria-label="Descargar JSON"
             >
               Exportar JSON
@@ -276,7 +284,10 @@ const HistoricalChart = ({
       </div>
 
       <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
           <XAxis
             dataKey="timestamp"
@@ -290,8 +301,24 @@ const HistoricalChart = ({
           <YAxis
             tick={{ fill: "#9ca3af", fontSize: 12 }}
             stroke="#374151"
+            domain={([dataMin, dataMax]) => {
+              const padding = (dataMax - dataMin) * 0.1 || 1;
+              return [
+                Math.floor(dataMin - padding),
+                Math.ceil(dataMax + padding),
+              ];
+            }}
             label={{
-              value: sensors.every((s) => s.includes("temp")) ? "°C" : sensors.every((s) => s.includes("humedad")) ? "%" : "°C / %",
+              value: sensors.every((s) => s.includes("temp"))
+                ? "°C"
+                : sensors.every((s) => s.includes("humedad"))
+                  ? "%"
+                  : sensors.every((s) => s.includes("peso"))
+                    ? "kg"
+                    : sensors.some((s) => s.includes("temp")) &&
+                        sensors.some((s) => s.includes("humedad"))
+                      ? "°C / %"
+                      : "valor",
               angle: -90,
               position: "insideLeft",
               style: { fill: "#9ca3af", fontSize: 12 },

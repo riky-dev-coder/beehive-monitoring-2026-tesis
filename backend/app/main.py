@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from contextlib import asynccontextmanager
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -60,14 +59,9 @@ app = FastAPI(
 allowed_origins = [
     "https://beekiping-monitoring2026.web.app",
     "https://boris-sulfurous-stephine.ngrok-free.dev",
-    "http://localhost:3000",
+    "http://localhost:8000",
     "http://localhost:5173",
 ]
-"""origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://boris-sulfurous-stephine.ngrok-free.dev",
-]"""
 
 app.add_middleware(
     CORSMiddleware,

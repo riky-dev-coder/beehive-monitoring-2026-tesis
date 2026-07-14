@@ -10,9 +10,11 @@ const SensorCards = ({ sensors }) => {
 
       {sensors.peso_total && (
         <div className={cardStyle}>
-          <div className={labelStyle}>Peso total</div>
+          <div className={labelStyle}>Peso cria</div>
           <div className={valueStyle}>
-            {sensors.peso_total.value.toFixed(1)} kg
+            {sensors.peso_total && sensors.peso_mielera
+                  ? (sensors.peso_total.value - sensors.peso_mielera.value).toFixed(1)
+                  : '--'} kg
           </div>
         </div>
       )}
