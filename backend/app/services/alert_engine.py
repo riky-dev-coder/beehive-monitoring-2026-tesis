@@ -22,7 +22,40 @@ async def evaluate_sensor_data(readings: List[SensorData]):
     """
     Evalúa una lista de lecturas y genera alertas si es necesario.
     """
-    # Primero evaluamos umbrales de temperatura y humedad
+    # Primero evaluamos valores especiales como desconexión de sensor
+    for reading in readings:
+        if reading.value == 0:
+            await create_custom_alert(
+                tipo=reading.sensor_type.value.split('_')[0],
+                severidad="info",
+                mensaje=f"Sensor desconectado o sin lectura válida: {reading.sensor_type.value}",
+                sensor_asociado=reading.sensor_type.value
+            )
+            continue
+
+    readings_by_type = {r.sensor_type: r for r in readings}
+
+    # Reglas críticas de temperatura
+    temp_cria = readings_by_type.get(SensorType.TEMP_CRIA)
+    temp_exterior = readings_by_type.get(SensorType.TEMP_EXTERIOR)
+
+    if temp_cria is not None and temp_cria.value != 0:
+        if temp_cria.value < 28 or temp_cria.value > 40:
+            await create_custom_alert(
+                tipo="temp",
+                severidad="critical",
+                mensaje=f"Temperatura crítica de cría: {temp_cria.value:.1f} °C",
+                sensor_asociado=SensorType.TEMP_CRIA.value
+            )
+        elif temp_exterior is not None and temp_exterior.value != 0 and temp_exterior.value < 0 and temp_cria.value < 32:
+            await create_custom_alert(
+                tipo="temp",
+                severidad="critical",
+                mensaje=f"Riesgo crítico por frío exterior: temperatura exterior {temp_exterior.value:.1f} °C y cría {temp_cria.value:.1f} °C",
+                sensor_asociado=SensorType.TEMP_CRIA.value
+            )
+
+    # Luego evaluamos umbrales de temperatura y humedad
     for reading in readings:
         if reading.sensor_type in THRESHOLDS:
             min_val, max_val = THRESHOLDS[reading.sensor_type]
@@ -30,9 +63,6 @@ async def evaluate_sensor_data(readings: List[SensorData]):
                 await create_alert_from_reading(reading, f"Valor fuera de rango ({min_val}-{max_val})")
     
     # Evaluaciones especiales para pesos
-    # Necesitamos tener las lecturas agrupadas por tipo para poder comparar
-    readings_by_type = {r.sensor_type: r for r in readings}
-    
     # Peso de cría fuera de rango
     if SensorType.PESO_TOTAL in readings_by_type:
         peso_total = readings_by_type[SensorType.PESO_TOTAL].value

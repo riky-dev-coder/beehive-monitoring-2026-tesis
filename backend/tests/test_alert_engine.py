@@ -62,6 +62,70 @@ class TestAlertEngineLogic:
             await evaluate_sensor_data(readings)
 
     @pytest.mark.asyncio
+    async def test_zero_value_triggers_disconnected_sensor_alert(self):
+        """Test: Un valor 0 debe generar una alerta informativa de sensor desconectado."""
+        readings = [
+            SensorData(
+                timestamp=datetime.now(timezone.utc),
+                sensor_type=SensorType.TEMP_CRIA,
+                value=0.0,
+                unit="°C"
+            )
+        ]
+
+        with patch('app.services.alert_engine.create_custom_alert') as mock_create:
+            await evaluate_sensor_data(readings)
+            mock_create.assert_awaited_once()
+            _, kwargs = mock_create.await_args
+            assert kwargs['severidad'] == 'info'
+            assert 'desconectado' in kwargs['mensaje'].lower()
+            assert kwargs['sensor_asociado'] == SensorType.TEMP_CRIA.value
+
+    @pytest.mark.asyncio
+    async def test_critical_temperature_low_brood_triggers_alert(self):
+        """Test: Temperatura de cría < 28°C debe generar alerta crítica."""
+        readings = [
+            SensorData(
+                timestamp=datetime.now(timezone.utc),
+                sensor_type=SensorType.TEMP_CRIA,
+                value=25.0,
+                unit="°C"
+            )
+        ]
+
+        with patch('app.services.alert_engine.create_custom_alert') as mock_create:
+            await evaluate_sensor_data(readings)
+            mock_create.assert_awaited_once()
+            _, kwargs = mock_create.await_args
+            assert kwargs['severidad'] == 'critical'
+            assert 'crítica' in kwargs['mensaje'].lower() or 'crítico' in kwargs['mensaje'].lower()
+
+    @pytest.mark.asyncio
+    async def test_critical_temperature_extreme_combination_triggers_alert(self):
+        """Test: Exterior < 0°C y cría < 32°C debe generar alerta crítica."""
+        readings = [
+            SensorData(
+                timestamp=datetime.now(timezone.utc),
+                sensor_type=SensorType.TEMP_CRIA,
+                value=30.0,
+                unit="°C"
+            ),
+            SensorData(
+                timestamp=datetime.now(timezone.utc),
+                sensor_type=SensorType.TEMP_EXTERIOR,
+                value=-5.0,
+                unit="°C"
+            )
+        ]
+
+        with patch('app.services.alert_engine.create_custom_alert') as mock_create:
+            await evaluate_sensor_data(readings)
+            mock_create.assert_awaited_once()
+            _, kwargs = mock_create.await_args
+            assert kwargs['severidad'] == 'critical'
+            assert 'riesgo crítico' in kwargs['mensaje'].lower() or 'frío exterior' in kwargs['mensaje'].lower()
+
+    @pytest.mark.asyncio
     async def test_weight_calculation_within_range(self):
         """Test: Peso de cría calculado dentro de rango no genera alerta."""
         readings = [

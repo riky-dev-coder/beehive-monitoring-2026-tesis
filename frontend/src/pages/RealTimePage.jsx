@@ -387,7 +387,7 @@ export default function RealTimePage() {
           </div>
           <div className="p-2 bg-[#071014] rounded">
             <span className="text-gray-500">Alimentos</span>
-            <p className="text-emerald-400 font-medium mt-1">✓ Suficiente</p>
+            <p className="text-amber-500 font-medium mt-1">⚠ Regular</p>
           </div>
           <div className="p-2 bg-[#071014] rounded">
             <span className="text-gray-500">Espacio</span>
