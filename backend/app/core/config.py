@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field('https://openrouter.ai/api/v1', env='OPENROUTER_BASE_URL')
 
     # Resend
-    resend_api_key: str = Field(..., env='RESEND_API_KEY')
+    resend_api_key: Optional[str] = Field(default=None, env='RESEND_API_KEY')
     resend_from_email: str = Field('alertas-beehive@municastilla-arequipa.gob.pe', env='RESEND_FROM_EMAIL')
     resend_to_email: str = Field('mizdezu@gmail.com', env='RESEND_TO_EMAIL')
     

@@ -18,13 +18,29 @@ THRESHOLDS = {
     # Pesos: el peso de cría tiene rango, el de mielera tiene umbral mínimo y alerta de disminución
 }
 
+
+def _is_disconnected_value(value) -> bool:
+    """Detiene si un valor representa una lectura desconectada o inválida."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        try:
+            return float(value) == 0.0
+        except ValueError:
+            return False
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
+
+
 async def evaluate_sensor_data(readings: List[SensorData]):
     """
     Evalúa una lista de lecturas y genera alertas si es necesario.
     """
     # Primero evaluamos valores especiales como desconexión de sensor
     for reading in readings:
-        if reading.value == 0:
+        if _is_disconnected_value(reading.value):
             await create_custom_alert(
                 tipo=reading.sensor_type.value.split('_')[0],
                 severidad="info",
@@ -39,7 +55,7 @@ async def evaluate_sensor_data(readings: List[SensorData]):
     temp_cria = readings_by_type.get(SensorType.TEMP_CRIA)
     temp_exterior = readings_by_type.get(SensorType.TEMP_EXTERIOR)
 
-    if temp_cria is not None and temp_cria.value != 0:
+    if temp_cria is not None and not _is_disconnected_value(temp_cria.value):
         if temp_cria.value < 28 or temp_cria.value > 40:
             await create_custom_alert(
                 tipo="temp",
@@ -47,7 +63,7 @@ async def evaluate_sensor_data(readings: List[SensorData]):
                 mensaje=f"Temperatura crítica de cría: {temp_cria.value:.1f} °C",
                 sensor_asociado=SensorType.TEMP_CRIA.value
             )
-        elif temp_exterior is not None and temp_exterior.value != 0 and temp_exterior.value < 0 and temp_cria.value < 32:
+        elif temp_exterior is not None and not _is_disconnected_value(temp_exterior.value) and temp_exterior.value < 0 and temp_cria.value < 32:
             await create_custom_alert(
                 tipo="temp",
                 severidad="critical",
