@@ -39,17 +39,21 @@ async def evaluate_sensor_data(readings: List[SensorData]):
     Evalúa una lista de lecturas y genera alertas si es necesario.
     """
     # Primero evaluamos valores especiales como desconexión de sensor
+    disconnected_readings = []
     for reading in readings:
         if _is_disconnected_value(reading.value):
-            await create_custom_alert(
-                tipo=reading.sensor_type.value.split('_')[0],
-                severidad="info",
-                mensaje=f"Sensor desconectado o sin lectura válida: {reading.sensor_type.value}",
-                sensor_asociado=reading.sensor_type.value
-            )
+            disconnected_readings.append(reading)
             continue
 
-    readings_by_type = {r.sensor_type: r for r in readings}
+    for reading in disconnected_readings:
+        await create_custom_alert(
+            tipo=reading.sensor_type.value.split('_')[0],
+            severidad="info",
+            mensaje=f"Sensor desconectado o sin lectura válida: {reading.sensor_type.value}",
+            sensor_asociado=reading.sensor_type.value
+        )
+
+    readings_by_type = {r.sensor_type: r for r in readings if not _is_disconnected_value(r.value)}
 
     # Reglas críticas de temperatura
     temp_cria = readings_by_type.get(SensorType.TEMP_CRIA)
@@ -71,8 +75,10 @@ async def evaluate_sensor_data(readings: List[SensorData]):
                 sensor_asociado=SensorType.TEMP_CRIA.value
             )
 
-    # Luego evaluamos umbrales de temperatura y humedad
+    # Luego evaluamos umbrales de temperatura y humedad solo para lecturas válidas
     for reading in readings:
+        if _is_disconnected_value(reading.value):
+            continue
         if reading.sensor_type in THRESHOLDS:
             min_val, max_val = THRESHOLDS[reading.sensor_type]
             if reading.value < min_val or reading.value > max_val:
