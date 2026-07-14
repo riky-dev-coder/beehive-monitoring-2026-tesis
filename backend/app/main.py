@@ -9,6 +9,7 @@ import pytz
 from app.api.routes import sensor_router, alerts_router, recommendations_router
 from app.core.config import settings
 from app.services.data_fetcher import fetch_and_store_latest_data
+from app.services.recommendation_email import send_latest_recommendation_email
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +27,15 @@ async def fetch_data_task():
     except Exception as e:
         logger.exception("Error en tarea programada")
 
+
+async def send_recommendation_email_task():
+    """Tarea programada para enviar por correo la última recomendación IA."""
+    logger.info("Ejecutando tarea programada: envío de recomendación por correo")
+    try:
+        await send_latest_recommendation_email()
+    except Exception as e:
+        logger.exception("Error en tarea programada de correo")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Código de inicio
@@ -39,8 +49,14 @@ async def lifespan(app: FastAPI):
         id="fetch_thingspeak",
         replace_existing=True
     )
+    scheduler.add_job(
+        send_recommendation_email_task,
+        trigger=IntervalTrigger(minutes=40),
+        id="send_latest_recommendation_email",
+        replace_existing=True
+    )
     scheduler.start()
-    logger.info("Scheduler iniciado. Tarea programada cada 40 segundos.")
+    logger.info("Scheduler iniciado. Tareas programadas: ThingSpeak cada 40 segundos y correo cada 40 minutos.")
     yield
     # Código de cierre
     logger.info("Deteniendo aplicación...")

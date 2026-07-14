@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     # OpenRouter
     openrouter_api_key: str = Field(..., env='OPENROUTER_API_KEY')
     openrouter_base_url: str = Field('https://openrouter.ai/api/v1', env='OPENROUTER_BASE_URL')
+
+    # Resend
+    resend_api_key: Optional[str] = Field(default=None, env='RESEND_API_KEY')
+    resend_from_email: str = Field(default='onboarding@resend.dev', env='RESEND_FROM_EMAIL')
+    resend_to_email: str = Field(default='mizdezu@gmail.com', env='RESEND_TO_EMAIL')
     
     # Umbrales de alerta
     temp_cria_min: float = 34.0

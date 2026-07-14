@@ -17,7 +17,7 @@ async def predict_harvest_date() -> Optional[datetime]:
     Retorna la fecha estimada o None si no hay suficientes datos o la tendencia es negativa.
     """
     supabase = get_supabase_client()
-    # Obtener últimos 7 días de lecturas de peso mielera, con un máximo de 100 puntos
+    # Obtener últimos días de lecturas de peso mielera, con un máximo de 100 puntos
     response = supabase.table("sensor_readings")\
         .select("timestamp, value")\
         .eq("sensor_type", SensorType.PESO_MIELERA.value)\
